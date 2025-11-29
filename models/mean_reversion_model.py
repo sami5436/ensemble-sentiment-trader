@@ -71,10 +71,11 @@ def get_mean_reversion_vote(data):
     deviation_pct = ((current_price - current_sma) / current_sma) * 100
     
     # Determine vote
-    if deviation_pct < -2.0:
+    # SPY-optimized thresholds (±1.5% instead of ±2%)
+    if deviation_pct < -1.5:
         vote = 1
         signal = 'Bullish (Below SMA)'
-    elif deviation_pct > 2.0:
+    elif deviation_pct > 1.5:
         vote = -1
         signal = 'Bearish (Above SMA)'
     else:

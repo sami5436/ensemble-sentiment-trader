@@ -9,6 +9,7 @@ from datetime import datetime, timedelta
 
 from data_fetcher import (
     fetch_spy_data,
+    fetch_all_data,
     slice_data_to_date,
     get_next_day_return,
     get_latest_trading_date
@@ -30,10 +31,20 @@ st.markdown("---")
 
 # Fetch data (cached)
 try:
-    with st.spinner("Fetching SPY data..."):
-        full_data = fetch_spy_data()
+    with st.spinner("Fetching SPY, VIX, Treasury, and Sector ETF data..."):
+        all_data = fetch_all_data()
+        full_data = all_data['spy']
+        vix_data = all_data['vix']
+        sector_data = all_data['sectors']
     
-    st.success(f"✅ Loaded {len(full_data)} days of SPY data")
+    data_sources = []
+    data_sources.append(f"SPY: {len(full_data)} days")
+    if not vix_data.empty:
+        data_sources.append(f"VIX: {len(vix_data)} days")
+    if sector_data:
+        data_sources.append(f"Sectors: {', '.join(sector_data.keys())}")
+    
+    st.success(f"✅ Loaded data - {' | '.join(data_sources)}")
     
 except Exception as e:
     st.error(f"❌ Error fetching data: {str(e)}")
@@ -57,10 +68,10 @@ with tab1:
     
     # Run ensemble
     with st.spinner("Running ensemble models..."):
-        results = run_ensemble(current_data)
+        results = run_ensemble(current_data, vix_data, sector_data)
     
     # Display Net Vote
-    col1, col2, col3 = st.columns([1, 1, 1])
+    col1, col2, col3, col4 = st.columns([1, 1, 1, 1])
     
     with col1:
         st.metric(
@@ -85,6 +96,12 @@ with tab1:
         st.metric(
             label="SPY Price",
             value=f"${current_price:.2f}"
+        )
+    
+    with col4:
+        st.metric(
+            label="Active Models",
+            value=f"{results['active_models']}/10"
         )
     
     # Display breakdown
@@ -114,15 +131,16 @@ with tab1:
     # Legend
     st.markdown("""
     **Vote Weight Scale:**
-    - RSI, Mean Reversion, ML, Factor: ±1 vote
-    - GARCH, Technical Support: ±3 votes
+    - Light models (±1): RSI, Mean Reversion, ML, Factor, MACD+BB
+    - Medium models (±2): Market Regime, Sector Rotation
+    - Heavy models (±3): GARCH, Technical Support, VIX Regime
     
-    **Recommendation Thresholds:**
-    - Strong Buy: ≥ 5 votes
-    - Buy: 2-4 votes
-    - Neutral/Hold: -1 to 1 votes
-    - Sell: -4 to -2 votes
-    - Strong Sell: ≤ -5 votes
+    **Recommendation Thresholds (10 models):**
+    - Strong Buy: ≥ 6 votes
+    - Buy: 3-5 votes
+    - Neutral/Hold: -2 to 2 votes
+    - Sell: -5 to -3 votes
+    - Strong Sell: ≤ -6 votes
     """)
 
 # ========== TAB 2: TIME MACHINE BACKTEST ==========
@@ -162,7 +180,7 @@ with tab2:
         
         # Run ensemble on historical data
         with st.spinner("Running ensemble on historical data..."):
-            historical_results = run_ensemble(historical_data)
+            historical_results = run_ensemble(historical_data, vix_data, sector_data)
         
         # Display results
         col1, col2 = st.columns(2)
@@ -280,7 +298,7 @@ with tab2:
                         test_data = slice_data_to_date(full_data, test_date)
                         
                         # Run ensemble
-                        result = run_ensemble(test_data)
+                        result = run_ensemble(test_data, vix_data, sector_data)
                         
                         # Get actual next day return
                         actual_return, next_date = get_next_day_return(full_data, test_date)

@@ -114,3 +114,102 @@ def get_latest_trading_date(data):
         datetime: Latest trading date
     """
     return data.index[-1]
+
+
+@st.cache_data(ttl=3600)
+def fetch_vix_data():
+    """
+    Fetch CBOE VIX (Volatility Index) data.
+    VIX measures market fear/volatility - key predictor for SPY movements.
+    
+    Returns:
+        pd.DataFrame: Historical VIX data with OHLCV columns
+    """
+    try:
+        vix = yf.Ticker("^VIX")
+        data = vix.history(period="max")
+        
+        if data.empty:
+            raise ValueError("Failed to fetch VIX data from yfinance")
+        
+        return data
+    except Exception as e:
+        st.warning(f"⚠️ Could not fetch VIX data: {str(e)}")
+        return pd.DataFrame()
+
+
+@st.cache_data(ttl=3600)
+def fetch_treasury_data():
+    """
+    Fetch 10-Year Treasury Yield (^TNX) data.
+    Treasury yields indicate institutional money flow and risk appetite.
+    
+    Returns:
+        pd.DataFrame: Historical Treasury yield data
+    """
+    try:
+        tnx = yf.Ticker("^TNX")
+        data = tnx.history(period="max")
+        
+        if data.empty:
+            raise ValueError("Failed to fetch Treasury data from yfinance")
+        
+        return data
+    except Exception as e:
+        st.warning(f"⚠️ Could not fetch Treasury data: {str(e)}")
+        return pd.DataFrame()
+
+
+@st.cache_data(ttl=3600)
+def fetch_sector_etfs():
+    """
+    Fetch major sector ETF data for rotation analysis.
+    - XLK: Technology Select Sector (~30% of SPY)
+    - XLF: Financial Select Sector (~13% of SPY)
+    - XLE: Energy Select Sector (~4% of SPY)
+    
+    Returns:
+        dict: Dictionary of sector dataframes {'XLK': df, 'XLF': df, 'XLE': df}
+    """
+    sectors = ['XLK', 'XLF', 'XLE']
+    sector_data = {}
+    
+    for sector in sectors:
+        try:
+            ticker = yf.Ticker(sector)
+            data = ticker.history(period="max")
+            
+            if not data.empty:
+                sector_data[sector] = data
+            else:
+                st.warning(f"⚠️ Could not fetch {sector} data")
+        except Exception as e:
+            st.warning(f"⚠️ Error fetching {sector}: {str(e)}")
+    
+    return sector_data
+
+
+@st.cache_data(ttl=3600)
+def fetch_all_data():
+    """
+    Fetch all required data sources and align them by date.
+    
+    Returns:
+        dict: {
+            'spy': pd.DataFrame,
+            'vix': pd.DataFrame,
+            'treasury': pd.DataFrame,
+            'sectors': dict
+        }
+    """
+    data = {}
+    
+    # Fetch SPY (primary data)
+    data['spy'] = fetch_spy_data()
+    
+    # Fetch supplementary data
+    data['vix'] = fetch_vix_data()
+    data['treasury'] = fetch_treasury_data()
+    data['sectors'] = fetch_sector_etfs()
+    
+    return data

@@ -68,10 +68,11 @@ def get_rsi_vote(data):
         }
     
     # Determine vote
-    if current_rsi < 30:
+    # SPY-optimized thresholds (35/65 instead of traditional 30/70)
+    if current_rsi < 35:
         vote = 1
         signal = 'Bullish (Oversold)'
-    elif current_rsi > 70:
+    elif current_rsi > 65:
         vote = -1
         signal = 'Bearish (Overbought)'
     else:
