@@ -256,6 +256,13 @@ with tab2:
                 start_datetime = pd.to_datetime(start_date)
                 end_datetime = pd.to_datetime(end_date)
                 
+                # Handle timezone mismatch - localize datetimes if data index has timezone
+                if full_data.index.tz is not None:
+                    if start_datetime.tz is None:
+                        start_datetime = start_datetime.tz_localize(full_data.index.tz)
+                    if end_datetime.tz is None:
+                        end_datetime = end_datetime.tz_localize(full_data.index.tz)
+                
                 # Get all trading dates in range
                 date_range = full_data[(full_data.index >= start_datetime) & 
                                       (full_data.index <= end_datetime)].index
