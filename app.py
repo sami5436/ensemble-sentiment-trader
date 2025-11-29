@@ -388,7 +388,7 @@ with tab2:
                                 title="Prediction Accuracy",
                                 height=300
                             )
-                            st.plotly_chart(fig, use_container_width=True)
+                            st.plotly_chart(fig, use_container_width=True, key="range_pie_chart")
                         
                         with col2:
                             # Performance over time
@@ -408,7 +408,7 @@ with tab2:
                             fig.update_traces(line_color='#4CAF50')
                             fig.add_hline(y=50, line_dash="dash", line_color="gray", 
                                          annotation_text="Random (50%)")
-                            st.plotly_chart(fig, use_container_width=True)
+                            st.plotly_chart(fig, use_container_width=True, key="range_accuracy_time")
                         
                         # Model-level analysis
                         st.markdown("---")
@@ -461,7 +461,7 @@ with tab2:
                         )
                         fig.add_hline(y=50, line_dash="dash", line_color="gray", 
                                      annotation_text="Random (50%)")
-                        st.plotly_chart(fig, use_container_width=True)
+                        st.plotly_chart(fig, use_container_width=True, key="range_model_accuracy")
                         
                         # Detailed model stats table
                         st.dataframe(
@@ -607,7 +607,7 @@ with tab3:
                             title="Prediction Accuracy",
                             height=300
                         )
-                        st.plotly_chart(fig, use_container_width=True)
+                        st.plotly_chart(fig, use_container_width=True, key=f"prev_pie_{idx}")
                     
                     with col2:
                         import plotly.express as px
@@ -628,7 +628,7 @@ with tab3:
                         fig.update_traces(line_color='#4CAF50')
                         fig.add_hline(y=50, line_dash="dash", line_color="gray", 
                                      annotation_text="Random (50%)")
-                        st.plotly_chart(fig, use_container_width=True)
+                        st.plotly_chart(fig, use_container_width=True, key=f"prev_accuracy_{idx}")
                     
                     # Model Performance Analysis
                     st.markdown("---")
@@ -647,7 +647,7 @@ with tab3:
                     )
                     fig.add_hline(y=50, line_dash="dash", line_color="gray", 
                                  annotation_text="Random (50%)")
-                    st.plotly_chart(fig, use_container_width=True)
+                    st.plotly_chart(fig, use_container_width=True, key=f"prev_model_{idx}")
                     
                     st.dataframe(
                         model_stats_df.style.background_gradient(subset=['Accuracy'], cmap='RdYlGn', vmin=0, vmax=100),
