@@ -16,6 +16,9 @@ from data_fetcher import (
 )
 from ensemble import run_ensemble
 
+# Initialize session state for run history
+if 'run_history' not in st.session_state:
+    st.session_state['run_history'] = []
 
 # Page configuration
 st.set_page_config(
@@ -51,7 +54,7 @@ except Exception as e:
     st.stop()
 
 # Create tabs
-tab1, tab2 = st.tabs(["🔮 Live Forecast", "⏰ Time Machine Backtest"])
+tab1, tab2, tab3 = st.tabs(["🔮 Live Forecast", "⏰ Time Machine Backtest", "📚 Previous Runs"])
 
 # ========== TAB 1: LIVE FORECAST ==========
 with tab1:
@@ -243,6 +246,25 @@ with tab2:
             use_container_width=True,
             hide_index=True
         )
+        
+        # Save to run history
+        run_data = {
+            'type': 'single_date',
+            'timestamp': datetime.now().strftime('%Y-%m-%d %H:%M:%S'),
+            'date': selected_datetime.strftime('%Y-%m-%d'),
+            'net_vote': historical_results['net_vote'],
+            'recommendation': historical_results['recommendation'],
+            'rec_color': historical_results['rec_color'],
+            'breakdown': historical_results['breakdown'],
+            'actual_return': actual_return,
+            'next_date': next_date.strftime('%Y-%m-%d') if next_date is not None else None,
+            'correct': (historical_results['net_vote'] > 0) == (actual_return > 0) if actual_return is not None else None
+        }
+        
+        # Add to history (keep last 5)
+        st.session_state['run_history'].insert(0, run_data)
+        if len(st.session_state['run_history']) > 5:
+            st.session_state['run_history'].pop()
     
     else:
         # ===== DATE RANGE ANALYSIS MODE =====
@@ -465,6 +487,191 @@ with tab2:
                             use_container_width=True,
                             hide_index=True
                         )
+                        
+                        # Save to run history
+                        run_data = {
+                            'type': 'date_range',
+                            'timestamp': datetime.now().strftime('%Y-%m-%d %H:%M:%S'),
+                            'start_date': start_date.strftime('%Y-%m-%d'),
+                            'end_date': end_date.strftime('%Y-%m-%d'),
+                            'accuracy': accuracy,
+                            'total_trades': total_trades,
+                            'correct_trades': correct_trades,
+                            'incorrect_trades': incorrect_trades,
+                            'results_df': results_df,  # Store full dataframe for charts
+                            'model_stats_df': model_stats_df  # Store model stats
+                        }
+                        
+                        # Add to history (keep last 5)
+                        st.session_state['run_history'].insert(0, run_data)
+                        if len(st.session_state['run_history']) > 5:
+                            st.session_state['run_history'].pop()
+
+# ========== TAB 3: PREVIOUS RUNS ==========
+with tab3:
+    st.header("📚 Previous Runs")
+    st.markdown("Review your last 5 backtest runs from this session.")
+    
+    if len(st.session_state['run_history']) == 0:
+        st.info("No previous runs yet. Run a backtest in the Time Machine tab to see results here!")
+    else:
+        for idx, run in enumerate(st.session_state['run_history']):
+            # Create expander for each run
+            if run['type'] == 'single_date':
+                label = f"#{idx+1} - Single Date: {run['date']} | {run['recommendation']} | Run at {run['timestamp']}"
+            else:
+                label = f"#{idx+1} - Date Range: {run['start_date']} to {run['end_date']} | Accuracy: {run['accuracy']:.1f}% | Run at {run['timestamp']}"
+            
+            with st.expander(label, expanded=(idx == 0)):
+                if run['type'] == 'single_date':
+                    # ===== SINGLE DATE RUN =====
+                    st.markdown(f"### 📅 {run['date']}")
+                    
+                    col1, col2 = st.columns(2)
+                    
+                    with col1:
+                        st.markdown("#### 🗳️ Ensemble Prediction")
+                        st.metric("Net Vote", run['net_vote'])
+                        
+                        if run['rec_color'] == 'green':
+                            st.markdown(f"## :green[{run['recommendation']}]")
+                        elif run['rec_color'] == 'red':
+                            st.markdown(f"## :red[{run['recommendation']}]")
+                        elif run['rec_color'] == 'orange':
+                            st.markdown(f"## :orange[{run['recommendation']}]")
+                        else:
+                            st.markdown(f"## {run['recommendation']}")
+                    
+                    with col2:
+                        st.markdown("#### ✅ Reality Check")
+                        
+                        if run['actual_return'] is not None:
+                            st.metric(
+                                "Actual Next Day Return",
+                                f"{run['actual_return']:+.2f}%"
+                            )
+                            
+                            st.info(f"Next Trading Day: **{run['next_date']}**")
+                            
+                            if run['correct']:
+                                st.success("✅ **CORRECT PREDICTION!**")
+                            else:
+                                st.error("❌ **INCORRECT PREDICTION**")
+                            
+                            if run['actual_return'] > 0:
+                                st.markdown("📈 Market moved **UP** (Green Day)")
+                            else:
+                                st.markdown("📉 Market moved **DOWN** (Red Day)")
+                        else:
+                            st.warning("⚠️ Next day data not available")
+                    
+                    # Vote breakdown
+                    st.markdown("---")
+                    st.subheader("📊 Vote Breakdown")
+                    
+                    breakdown_df = pd.DataFrame(run['breakdown'])
+                    styled_df = breakdown_df.style.applymap(color_vote, subset=['vote'])
+                    st.dataframe(styled_df, use_container_width=True, hide_index=True)
+                
+                else:
+                    # ===== DATE RANGE RUN =====
+                    st.markdown(f"### 📊 {run['start_date']} to {run['end_date']}")
+                    
+                    # Display metrics
+                    col1, col2, col3, col4 = st.columns(4)
+                    with col1:
+                        st.metric("Accuracy", f"{run['accuracy']:.1f}%")
+                    with col2:
+                        st.metric("Total Predictions", run['total_trades'])
+                    with col3:
+                        st.metric("✅ Correct", run['correct_trades'])
+                    with col4:
+                        st.metric("❌ Incorrect", run['incorrect_trades'])
+                    
+                    # Success/Failure Pie Chart
+                    st.markdown("---")
+                    st.subheader("🎯 Success vs Failure")
+                    
+                    col1, col2 = st.columns([1, 2])
+                    
+                    with col1:
+                        import plotly.graph_objects as go
+                        
+                        fig = go.Figure(data=[go.Pie(
+                            labels=['Correct', 'Incorrect'],
+                            values=[run['correct_trades'], run['incorrect_trades']],
+                            marker=dict(colors=['#90EE90', '#FFB6C1']),
+                            hole=0.3
+                        )])
+                        fig.update_layout(
+                            title="Prediction Accuracy",
+                            height=300
+                        )
+                        st.plotly_chart(fig, use_container_width=True)
+                    
+                    with col2:
+                        import plotly.express as px
+                        
+                        # Use stored results_df
+                        results_df = run['results_df'].copy()
+                        results_df['cumulative_correct'] = results_df['correct'].cumsum()
+                        results_df['cumulative_accuracy'] = (results_df['cumulative_correct'] / 
+                                                             (results_df.index + 1)) * 100
+                        
+                        fig = px.line(
+                            results_df,
+                            x='date',
+                            y='cumulative_accuracy',
+                            title='Accuracy Over Time',
+                            labels={'cumulative_accuracy': 'Accuracy (%)', 'date': 'Date'}
+                        )
+                        fig.update_traces(line_color='#4CAF50')
+                        fig.add_hline(y=50, line_dash="dash", line_color="gray", 
+                                     annotation_text="Random (50%)")
+                        st.plotly_chart(fig, use_container_width=True)
+                    
+                    # Model Performance Analysis
+                    st.markdown("---")
+                    st.subheader("🔬 Model Performance Analysis")
+                    
+                    model_stats_df = run['model_stats_df']
+                    
+                    fig = px.bar(
+                        model_stats_df,
+                        x='Model',
+                        y='Accuracy',
+                        title='Individual Model Accuracy (when making non-zero predictions)',
+                        color='Accuracy',
+                        color_continuous_scale=['red', 'yellow', 'green'],
+                        range_color=[0, 100]
+                    )
+                    fig.add_hline(y=50, line_dash="dash", line_color="gray", 
+                                 annotation_text="Random (50%)")
+                    st.plotly_chart(fig, use_container_width=True)
+                    
+                    st.dataframe(
+                        model_stats_df.style.background_gradient(subset=['Accuracy'], cmap='RdYlGn', vmin=0, vmax=100),
+                        use_container_width=True,
+                        hide_index=True
+                    )
+                    
+                    # Recent predictions
+                    st.markdown("---")
+                    st.subheader("📋 Recent Predictions")
+                    
+                    recent_df = results_df[['date', 'prediction', 'net_vote', 'actual_direction', 
+                                           'actual_return', 'correct']].tail(20).copy()
+                    recent_df['date'] = recent_df['date'].dt.strftime('%Y-%m-%d')
+                    recent_df['actual_return'] = recent_df['actual_return'].round(2)
+                    
+                    def highlight_correct(val):
+                        return 'background-color: #90EE90' if val else 'background-color: #FFB6C1'
+                    
+                    st.dataframe(
+                        recent_df.style.applymap(highlight_correct, subset=['correct']),
+                        use_container_width=True,
+                        hide_index=True
+                    )
 
 # Footer
 st.markdown("---")
